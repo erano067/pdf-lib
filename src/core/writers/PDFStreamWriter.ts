@@ -1,4 +1,4 @@
-import { defaultDocumentSnapshot, DocumentSnapshot } from 'src/api';
+import { defaultDocumentSnapshot, DocumentSnapshot } from 'src/api/snapshot';
 import PDFHeader from 'src/core/document/PDFHeader';
 import PDFTrailer from 'src/core/document/PDFTrailer';
 import PDFInvalidObject from 'src/core/objects/PDFInvalidObject';

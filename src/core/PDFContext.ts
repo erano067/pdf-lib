@@ -1,4 +1,5 @@
 import pako from 'pako';
+import { DocumentSnapshot } from 'src/api';
 
 import PDFHeader from 'src/core/document/PDFHeader';
 import { UnexpectedObjectTypeError } from 'src/core/errors';
@@ -60,7 +61,9 @@ class PDFContext {
     pdfSize: number;
     prevStartXRef: number;
     useObjectStreams: boolean;
+    originalBytes?: Uint8Array;
   };
+  snapshot?: DocumentSnapshot;
 
   private readonly indirectObjects: Map<PDFRef, PDFObject>;
 
@@ -303,6 +306,10 @@ class PDFContext {
 
   addRandomSuffix(prefix: string, suffixLength = 4): string {
     return `${prefix}-${Math.floor(this.rng.nextInt() * 10 ** suffixLength)}`;
+  }
+
+  registerObjectChange(obj: PDFObject) {
+    if (this.snapshot) this.snapshot.markObjForSave(obj);
   }
 }
 

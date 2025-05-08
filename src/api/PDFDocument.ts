@@ -135,12 +135,14 @@ export default class PDFDocument {
       throwOnInvalidObject = false,
       updateMetadata = true,
       capNumbers = false,
+      forIncrementalUpdate = false,
     } = options;
 
     assertIs(pdf, 'pdf', ['string', Uint8Array, ArrayBuffer]);
     assertIs(ignoreEncryption, 'ignoreEncryption', ['boolean']);
     assertIs(parseSpeed, 'parseSpeed', ['number']);
     assertIs(throwOnInvalidObject, 'throwOnInvalidObject', ['boolean']);
+    assertIs(forIncrementalUpdate, 'forIncrementalUpdate', ['boolean']);
 
     const bytes = toUint8Array(pdf);
     const context = await PDFParser.forBytesWithOptions(
@@ -148,8 +150,11 @@ export default class PDFDocument {
       parseSpeed,
       throwOnInvalidObject,
       capNumbers,
+      forIncrementalUpdate,
     ).parseDocument();
-    return new PDFDocument(context, ignoreEncryption, updateMetadata);
+    const pdfDoc = new PDFDocument(context, ignoreEncryption, updateMetadata);
+    if (forIncrementalUpdate) pdfDoc.takeSnapshot();
+    return pdfDoc;
   }
 
   /**
@@ -1267,14 +1272,44 @@ export default class PDFDocument {
    * @returns Resolves with the bytes of the serialized document.
    */
   async save(options: SaveOptions = {}): Promise<Uint8Array> {
-    const { useObjectStreams = true, objectsPerTick = 50 } = options;
+    const {
+      useObjectStreams = true,
+      objectsPerTick = 50,
+      rewrite = false,
+    } = options;
 
     assertIs(useObjectStreams, 'useObjectStreams', ['boolean']);
     assertIs(objectsPerTick, 'objectsPerTick', ['number']);
+    assertIs(rewrite, 'rewrite', ['boolean']);
+    const incrementalUpdate =
+      !rewrite &&
+      this.context.pdfFileDetails.originalBytes &&
+      this.context.snapshot;
+    if (incrementalUpdate) {
+      options.addDefaultPage = false;
+      options.updateFieldAppearances = false;
+    }
 
     await this.prepareForSave(options);
 
     const Writer = useObjectStreams ? PDFStreamWriter : PDFWriter;
+    if (incrementalUpdate) {
+      const increment = await Writer.forContextWithSnapshot(
+        this.context,
+        objectsPerTick,
+        this.context.snapshot!,
+      ).serializeToBuffer();
+      const result = new Uint8Array(
+        this.context.pdfFileDetails.originalBytes!.byteLength +
+          increment.byteLength,
+      );
+      result.set(this.context.pdfFileDetails.originalBytes!);
+      result.set(
+        increment,
+        this.context.pdfFileDetails.originalBytes!.byteLength,
+      );
+      return result;
+    }
     return Writer.forContext(this.context, objectsPerTick).serializeToBuffer();
   }
 
@@ -1360,13 +1395,18 @@ export default class PDFDocument {
   takeSnapshot(): DocumentSnapshot {
     const indirectObjects: number[] = [];
 
-    return new IncrementalDocumentSnapshot(
+    const snapshot = new IncrementalDocumentSnapshot(
       this.context.largestObjectNumber,
       indirectObjects,
       this.context.pdfFileDetails.pdfSize,
       this.context.pdfFileDetails.prevStartXRef,
       this.context,
     );
+    if (!this.context.snapshot && this.context.pdfFileDetails.originalBytes) {
+      this.context.snapshot = snapshot;
+      this.catalog.registerChange();
+    }
+    return snapshot;
   }
 
   private async prepareForSave(options: SaveOptions): Promise<void> {
@@ -1406,7 +1446,9 @@ export default class PDFDocument {
 
   private getInfoDict(): PDFDict {
     const existingInfo = this.context.lookup(this.context.trailerInfo.Info);
-    if (existingInfo instanceof PDFDict) return existingInfo;
+    if (existingInfo instanceof PDFDict) {
+      return existingInfo;
+    }
 
     const newInfo = this.context.obj({});
     this.context.trailerInfo.Info = this.context.register(newInfo);

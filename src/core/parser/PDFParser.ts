@@ -30,8 +30,15 @@ class PDFParser extends PDFObjectParser {
     objectsPerTick?: number,
     throwOnInvalidObject?: boolean,
     capNumbers?: boolean,
+    forIncrementalUpdate?: boolean,
   ) =>
-    new PDFParser(pdfBytes, objectsPerTick, throwOnInvalidObject, capNumbers);
+    new PDFParser(
+      pdfBytes,
+      objectsPerTick,
+      throwOnInvalidObject,
+      capNumbers,
+      forIncrementalUpdate,
+    );
 
   private readonly objectsPerTick: number;
   private readonly throwOnInvalidObject: boolean;
@@ -43,11 +50,15 @@ class PDFParser extends PDFObjectParser {
     objectsPerTick = Infinity,
     throwOnInvalidObject = false,
     capNumbers = false,
+    forIncrementalUpdate = false,
   ) {
     super(ByteStream.of(pdfBytes), PDFContext.create(), capNumbers);
     this.objectsPerTick = objectsPerTick;
     this.throwOnInvalidObject = throwOnInvalidObject;
     this.context.pdfFileDetails.pdfSize = pdfBytes.length;
+    if (forIncrementalUpdate) {
+      this.context.pdfFileDetails.originalBytes = pdfBytes;
+    }
   }
 
   async parseDocument(): Promise<PDFContext> {

@@ -15,6 +15,7 @@ export interface SaveOptions {
   addDefaultPage?: boolean;
   objectsPerTick?: number;
   updateFieldAppearances?: boolean;
+  rewrite?: boolean;
 }
 
 export interface IncrementalSaveOptions {
@@ -31,6 +32,7 @@ export interface LoadOptions {
   throwOnInvalidObject?: boolean;
   updateMetadata?: boolean;
   capNumbers?: boolean;
+  forIncrementalUpdate?: boolean;
 }
 
 export interface CreateOptions {

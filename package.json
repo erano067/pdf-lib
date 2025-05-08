@@ -1,6 +1,6 @@
 {
   "name": "pdf-lib",
-  "version": "1.17.1",
+  "version": "1.18.0",
   "description": "Create and modify PDF files with JavaScript",
   "author": "Andrew Dillon <andrew.dillon.j@gmail.com>",
   "contributors": [
@@ -30,7 +30,8 @@
     "Brent McSharry (https://github.com/mcshaz)",
     "Tim Knapp (https://github.com/duffyd)",
     "Ching Chang (https://github.com/ChingChang9)",
-    "Remus DRAICA (https://github.com/remdra)"
+    "Remus DRAICA (https://github.com/remdra)",
+    "David Abdala (https://github.com/adnsistemas)"
   ],
   "scripts": {
     "release:latest": "yarn publish --tag latest && yarn pack && yarn release:tag",
@@ -115,7 +116,7 @@
     "ts-jest": "^26.1.0",
     "tslint": "^6.1.2",
     "tslint-config-prettier": "^1.18.0",
-    "ttypescript": "^1.5.10",
+    "ttypescript": "^1.5.15",
     "typescript": "^3.9.5"
   },
   "license": "MIT",
@@ -138,5 +139,6 @@
     "typescript",
     "javascript",
     "library"
-  ]
+  ],
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
 }
