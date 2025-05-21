@@ -44,8 +44,10 @@ const openPdf = (path: string, reader: string = '') => {
   } else if (Deno.build.os === 'linux') {
     Deno.run({ cmd: ['xdg-open', path] });
   } else {
-    const msg1 = `Note: Automatically opening PDFs currently only works on Macs and Windows. If you're using a Linux machine, please consider contributing to expand support for this feature`;
-    const msg2 = `(https://github.com/Hopding/pdf-lib/blob/master/apps/node/index.ts#L8-L17)\n`;
+    const msg1 =
+      "Note: Automatically opening PDFs currently only works on Macs and Windows. If you're using a Linux machine, please consider contributing to expand support for this feature";
+    const msg2 =
+      '(https://github.com/Hopding/pdf-lib/blob/master/apps/node/index.ts#L8-L17)\n';
     console.warn(msg1);
     console.warn(msg2);
   }

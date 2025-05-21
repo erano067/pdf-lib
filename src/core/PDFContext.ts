@@ -1,25 +1,26 @@
 import pako from 'pako';
 import { DocumentSnapshot } from 'src/api';
 
-import PDFHeader from 'src/core/document/PDFHeader';
-import { UnexpectedObjectTypeError } from 'src/core/errors';
-import PDFArray from 'src/core/objects/PDFArray';
-import PDFBool from 'src/core/objects/PDFBool';
-import PDFDict from 'src/core/objects/PDFDict';
-import PDFHexString from 'src/core/objects/PDFHexString';
-import PDFName from 'src/core/objects/PDFName';
-import PDFNull from 'src/core/objects/PDFNull';
-import PDFNumber from 'src/core/objects/PDFNumber';
-import PDFObject from 'src/core/objects/PDFObject';
-import PDFRawStream from 'src/core/objects/PDFRawStream';
-import PDFRef from 'src/core/objects/PDFRef';
-import PDFStream from 'src/core/objects/PDFStream';
-import PDFString from 'src/core/objects/PDFString';
-import PDFOperator from 'src/core/operators/PDFOperator';
-import Ops from 'src/core/operators/PDFOperatorNames';
-import PDFContentStream from 'src/core/structures/PDFContentStream';
-import { typedArrayFor } from 'src/utils';
-import { SimpleRNG } from 'src/utils/rng';
+import PDFHeader from './document/PDFHeader';
+import { UnexpectedObjectTypeError } from './errors';
+import PDFArray from './objects/PDFArray';
+import PDFBool from './objects/PDFBool';
+import PDFDict from './objects/PDFDict';
+import PDFHexString from './objects/PDFHexString';
+import PDFName from './objects/PDFName';
+import PDFNull from './objects/PDFNull';
+import PDFNumber from './objects/PDFNumber';
+import PDFObject from './objects/PDFObject';
+import PDFRawStream from './objects/PDFRawStream';
+import PDFRef from './objects/PDFRef';
+import PDFStream from './objects/PDFStream';
+import PDFString from './objects/PDFString';
+import PDFOperator from './operators/PDFOperator';
+import Ops from './operators/PDFOperatorNames';
+import PDFContentStream from './structures/PDFContentStream';
+import PDFSecurity from './security/PDFSecurity';
+import { typedArrayFor } from '../utils';
+import { SimpleRNG } from '../utils/rng';
 
 type LookupKey = PDFRef | PDFObject | undefined;
 
@@ -40,12 +41,20 @@ type Literal =
   | null
   | undefined;
 
+interface LiteralConfig {
+  deep?: boolean;
+  literalRef?: boolean;
+  literalStreamDict?: boolean;
+  literalString?: boolean;
+}
+
 const byAscendingObjectNumber = (
   [a]: [PDFRef, PDFObject],
   [b]: [PDFRef, PDFObject],
 ) => a.objectNumber - b.objectNumber;
 
 class PDFContext {
+  isDecrypted = true;
   static create = () => new PDFContext();
 
   largestObjectNumber: number;
@@ -64,6 +73,8 @@ class PDFContext {
     originalBytes?: Uint8Array;
   };
   snapshot?: DocumentSnapshot;
+
+  security?: PDFSecurity;
 
   private readonly indirectObjects: Map<PDFRef, PDFObject>;
 
@@ -215,6 +226,8 @@ class PDFContext {
       return PDFNumber.of(literal);
     } else if (typeof literal === 'boolean') {
       return literal ? PDFBool.True : PDFBool.False;
+    } else if (literal instanceof Uint8Array) {
+      return PDFHexString.fromBytes(literal);
     } else if (Array.isArray(literal)) {
       const array = PDFArray.withContext(this);
       for (let idx = 0, len = literal.length; idx < len; idx++) {
@@ -231,6 +244,68 @@ class PDFContext {
       }
       return dict;
     }
+  }
+
+  /*
+   * @param obj The input PDFObject to convert to a literal.
+   * @param cfg The configuration to be used when converting the object.
+   * @param cfg.deep Recursively call this function on all encountered PDFArray elements and PDFDict values.
+   * @param cfg.literalRef Also convert PDFRef to a (literal) object number.
+   * @param cfg.literalStreamDict Also convert PDFStream to its associated dictionary's (literal) representation.
+   * @param cfg.literalString Also convert PDFString and PDFHexString to a (literal) string value.
+   * @returns Resolves with a document loaded from the input.
+   */
+  getLiteral(obj: PDFArray, cfg?: LiteralConfig): LiteralArray;
+  getLiteral(obj: PDFBool, cfg?: LiteralConfig): boolean;
+  getLiteral(obj: PDFDict, cfg?: LiteralConfig): LiteralObject;
+  getLiteral(obj: PDFHexString, cfg?: LiteralConfig): PDFHexString | string;
+  getLiteral(obj: PDFName, cfg?: LiteralConfig): string;
+  getLiteral(obj: typeof PDFNull, cfg?: LiteralConfig): null;
+  getLiteral(obj: PDFNumber, cfg?: LiteralConfig): number;
+  getLiteral(obj: PDFRef, cfg?: LiteralConfig): PDFRef | number;
+  getLiteral(obj: PDFStream, cfg?: LiteralConfig): PDFStream | LiteralObject;
+  getLiteral(obj: PDFString, cfg?: LiteralConfig): PDFString | string;
+  getLiteral(obj: PDFObject, cfg?: LiteralConfig): PDFObject;
+  getLiteral(
+    obj: PDFObject,
+    {
+      deep = true,
+      literalRef = false,
+      literalStreamDict = false,
+      literalString = false,
+    }: LiteralConfig = {},
+  ): Literal | PDFObject {
+    const cfg = { deep, literalRef, literalStreamDict, literalString };
+    if (obj instanceof PDFArray) {
+      const lit = obj.asArray();
+      return deep ? lit.map((value) => this.getLiteral(value, cfg)) : lit;
+    } else if (obj instanceof PDFBool) {
+      return obj.asBoolean();
+    } else if (obj instanceof PDFDict) {
+      const lit: LiteralObject = {};
+      const entries = obj.entries();
+      for (let idx = 0, len = entries.length; idx < len; idx++) {
+        const [name, value] = entries[idx];
+        lit[this.getLiteral(name)] = deep ? this.getLiteral(value, cfg) : value;
+      }
+      return lit;
+    } else if (obj instanceof PDFName) {
+      return obj.decodeText();
+    } else if (obj === PDFNull) {
+      return null;
+    } else if (obj instanceof PDFNumber) {
+      return obj.asNumber();
+    } else if (obj instanceof PDFRef && literalRef) {
+      return obj.objectNumber;
+    } else if (obj instanceof PDFStream && literalStreamDict) {
+      return this.getLiteral(obj.dict, cfg);
+    } else if (
+      (obj instanceof PDFString || obj instanceof PDFHexString) &&
+      literalString
+    ) {
+      return obj.asString();
+    }
+    return obj;
   }
 
   stream(

@@ -30,9 +30,9 @@ const cli = readline.createInterface({
   output: process.stdout,
 });
 
-const prompt = `Press <enter> to run the next test...`;
+const prompt = 'Press <enter> to run the next test...';
 const promptToContinue = () =>
-  new Promise((resolve) => cli.question(prompt, (_answer) => resolve()));
+  new Promise<void>((resolve) => cli.question(prompt, (_answer) => resolve()));
 
 // This needs to be more sophisticated to work on Linux as well.
 const openPdf = (path: string, _reader?: string) => {
@@ -49,10 +49,9 @@ const openPdf = (path: string, _reader?: string) => {
   } else if (process.platform === 'linux') {
     execSync(`xdg-open ${path}`);
   } else {
-    const msg1 = `Note: Automatically opening PDFs currently only works on Macs and Windows. If you're using a Linux machine, please consider contributing to expand support for this feature`;
-    const msg2 = `(https://github.com/Hopding/pdf-lib/blob/master/apps/node/index.ts#L8-L17)\n`;
-    console.warn(msg1);
-    console.warn(msg2);
+    console.warn(
+      `No script found for ${process.platform} platform. Please report this.`,
+    );
   }
 };
 

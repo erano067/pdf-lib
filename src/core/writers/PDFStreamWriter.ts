@@ -12,7 +12,10 @@ import PDFCrossRefStream from 'src/core/structures/PDFCrossRefStream';
 import PDFObjectStream from 'src/core/structures/PDFObjectStream';
 import PDFWriter from 'src/core/writers/PDFWriter';
 import { last, waitForTick } from 'src/utils';
-import PDFDict from '../objects/PDFDict';
+import PDFDict from 'src/core/objects/PDFDict';
+import PDFCatalog from 'src/core/structures/PDFCatalog';
+import PDFPageTree from 'src/core/structures/PDFPageTree';
+import PDFPageLeaf from 'src/core/structures/PDFPageLeaf';
 
 class PDFStreamWriter extends PDFWriter {
   static forContext = (
@@ -80,6 +83,8 @@ class PDFStreamWriter extends PDFWriter {
     const compressedObjects: [PDFRef, PDFObject][][] = [];
     const objectStreamRefs: PDFRef[] = [];
 
+    const security = this.context.security;
+
     const indirectObjects = this.context.enumerateIndirectObjects();
     for (let idx = 0, len = indirectObjects.length; idx < len; idx++) {
       const indirectObject = indirectObjects[idx];
@@ -92,12 +97,16 @@ class PDFStreamWriter extends PDFWriter {
         ref === this.context.trailerInfo.Encrypt ||
         object instanceof PDFStream ||
         object instanceof PDFInvalidObject ||
+        object instanceof PDFCatalog ||
+        object instanceof PDFPageTree ||
+        object instanceof PDFPageLeaf ||
         ref.generationNumber !== 0 ||
         (object instanceof PDFDict &&
           (object as PDFDict).lookup(PDFName.of('Type')) === PDFName.of('Sig'));
 
       if (shouldNotCompress) {
         uncompressedObjects.push(indirectObject);
+        if (security) this.encrypt(ref, object, security);
         xrefStream.addUncompressedEntry(ref, size);
         size += this.computeIndirectObjectSize(indirectObject);
         if (this.shouldWaitForTick(1)) await waitForTick();
@@ -124,6 +133,8 @@ class PDFStreamWriter extends PDFWriter {
         chunk,
         this.encodeStreams,
       );
+
+      if (security) this.encrypt(ref, objectStream, security);
 
       xrefStream.addUncompressedEntry(ref, size);
       size += this.computeIndirectObjectSize([ref, objectStream]);

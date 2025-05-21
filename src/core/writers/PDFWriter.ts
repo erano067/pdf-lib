@@ -157,14 +157,15 @@ class PDFWriter {
 
     const xref = PDFCrossRefSection.create();
 
+    const security = this.context.security;
+
     const indirectObjects = this.context.enumerateIndirectObjects();
 
     for (let idx = 0, len = indirectObjects.length; idx < len; idx++) {
       const indirectObject = indirectObjects[idx];
-      const [ref] = indirectObject;
-      if (!this.snapshot.shouldSave(ref.objectNumber)) {
-        continue;
-      }
+      const [ref, object] = indirectObject;
+      if (!this.snapshot.shouldSave(ref.objectNumber)) continue;
+      if (security) this.encrypt(ref, object, security);
       xref.addEntry(ref, size);
       size += this.computeIndirectObjectSize(indirectObject);
       if (this.shouldWaitForTick(1)) await waitForTick();
@@ -183,6 +184,18 @@ class PDFWriter {
     size -= this.snapshot.pdfSize;
 
     return { size, header, indirectObjects, xref, trailerDict, trailer };
+  }
+
+  protected encrypt(ref: PDFRef, object: PDFObject, security: PDFSecurity) {
+    if (object instanceof PDFStream) {
+      const encryptFn = security.getEncryptFn(
+        ref.objectNumber,
+        ref.generationNumber,
+      );
+      const unencryptedContents = object.getContents();
+      const encryptedContents = encryptFn(unencryptedContents);
+      object.updateContents(encryptedContents);
+    }
   }
 
   protected shouldWaitForTick = (n: number) => {

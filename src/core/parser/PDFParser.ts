@@ -1,47 +1,53 @@
-import PDFCrossRefSection from 'src/core/document/PDFCrossRefSection';
-import PDFHeader from 'src/core/document/PDFHeader';
-import PDFTrailer from 'src/core/document/PDFTrailer';
+import PDFCrossRefSection from '../document/PDFCrossRefSection';
+import PDFHeader from '../document/PDFHeader';
+import PDFTrailer from '../document/PDFTrailer';
 import {
   MissingKeywordError,
   MissingPDFHeaderError,
   PDFInvalidObjectParsingError,
   ReparseError,
   StalledParserError,
-} from 'src/core/errors';
-import PDFDict from 'src/core/objects/PDFDict';
-import PDFInvalidObject from 'src/core/objects/PDFInvalidObject';
-import PDFName from 'src/core/objects/PDFName';
-import PDFObject from 'src/core/objects/PDFObject';
-import PDFRawStream from 'src/core/objects/PDFRawStream';
-import PDFRef from 'src/core/objects/PDFRef';
-import ByteStream from 'src/core/parser/ByteStream';
-import PDFObjectParser from 'src/core/parser/PDFObjectParser';
-import PDFObjectStreamParser from 'src/core/parser/PDFObjectStreamParser';
-import PDFXRefStreamParser from 'src/core/parser/PDFXRefStreamParser';
-import PDFContext from 'src/core/PDFContext';
-import CharCodes from 'src/core/syntax/CharCodes';
-import { Keywords } from 'src/core/syntax/Keywords';
-import { IsDigit } from 'src/core/syntax/Numeric';
-import { waitForTick } from 'src/utils';
+} from '../errors';
+import PDFDict from '../objects/PDFDict';
+import PDFInvalidObject from '../objects/PDFInvalidObject';
+import PDFName from '../objects/PDFName';
+import PDFObject from '../objects/PDFObject';
+import PDFRawStream from '../objects/PDFRawStream';
+import PDFRef from '../objects/PDFRef';
+import ByteStream from './ByteStream';
+import PDFObjectParser from './PDFObjectParser';
+import PDFObjectStreamParser from './PDFObjectStreamParser';
+import PDFXRefStreamParser from './PDFXRefStreamParser';
+import PDFContext from '../PDFContext';
+import CharCodes from '../syntax/CharCodes';
+import { Keywords } from '../syntax/Keywords';
+import { IsDigit } from '../syntax/Numeric';
+import { waitForTick } from '../../utils';
+import { CipherTransformFactory } from '../crypto';
 
 class PDFParser extends PDFObjectParser {
   static forBytesWithOptions = (
     pdfBytes: Uint8Array,
     objectsPerTick?: number,
     throwOnInvalidObject?: boolean,
+    warnOnInvalidObjects?: boolean,
     capNumbers?: boolean,
+    cryptoFactory?: CipherTransformFactory,
     forIncrementalUpdate?: boolean,
   ) =>
     new PDFParser(
       pdfBytes,
       objectsPerTick,
       throwOnInvalidObject,
+      warnOnInvalidObjects,
       capNumbers,
+      cryptoFactory,
       forIncrementalUpdate,
     );
 
   private readonly objectsPerTick: number;
   private readonly throwOnInvalidObject: boolean;
+  private readonly warnOnInvalidObjects: boolean;
   private alreadyParsed = false;
   private parsedObjects = 0;
 
@@ -49,12 +55,21 @@ class PDFParser extends PDFObjectParser {
     pdfBytes: Uint8Array,
     objectsPerTick = Infinity,
     throwOnInvalidObject = false,
+    warnOnInvalidObjects = false,
     capNumbers = false,
+    cryptoFactory?: CipherTransformFactory,
     forIncrementalUpdate = false,
   ) {
-    super(ByteStream.of(pdfBytes), PDFContext.create(), capNumbers);
+    super(
+      ByteStream.of(pdfBytes),
+      PDFContext.create(),
+      capNumbers,
+      cryptoFactory,
+    );
     this.objectsPerTick = objectsPerTick;
     this.throwOnInvalidObject = throwOnInvalidObject;
+    this.warnOnInvalidObjects = warnOnInvalidObjects;
+    this.context.isDecrypted = !!cryptoFactory?.encryptionKey;
     this.context.pdfFileDetails.pdfSize = pdfBytes.length;
     if (forIncrementalUpdate) {
       this.context.pdfFileDetails.originalBytes = pdfBytes;
@@ -158,7 +173,7 @@ class PDFParser extends PDFObjectParser {
     const ref = this.parseIndirectObjectHeader();
 
     this.skipWhitespaceAndComments();
-    const object = this.parseObject();
+    const object = this.parseObject(ref);
 
     this.skipWhitespaceAndComments();
     // if (!this.matchKeyword(Keywords.endobj)) {
@@ -194,11 +209,11 @@ class PDFParser extends PDFObjectParser {
 
     const msg = `Trying to parse invalid object: ${JSON.stringify(startPos)})`;
     if (this.throwOnInvalidObject) throw new Error(msg);
-    console.warn(msg);
+    if (this.warnOnInvalidObjects) console.warn(msg);
 
     const ref = this.parseIndirectObjectHeader();
 
-    console.warn(`Invalid object ref: ${ref}`);
+    if (this.warnOnInvalidObjects) console.warn(`Invalid object ref: ${ref}`);
 
     this.skipWhitespaceAndComments();
     const start = this.bytes.offset();
@@ -255,6 +270,11 @@ class PDFParser extends PDFObjectParser {
     while (!this.bytes.done() && IsDigit[this.bytes.peek()]) {
       const firstInt = this.parseRawInt();
       this.skipWhitespaceAndComments();
+
+      // Check if second digit is valid integer
+      if (!IsDigit[this.bytes.peek()]) {
+        return PDFCrossRefSection.createEmpty();
+      }
 
       const secondInt = this.parseRawInt();
       this.skipWhitespaceAndComments();

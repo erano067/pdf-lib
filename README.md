@@ -1,3 +1,11 @@
+## Forked by [Cantoo](https://cantoo.fr)
+
+This fork adds the support for svg to the pdf-lib project. Until pdf-lib project gets a better maintainance, we will maintain this project as long as we need it but cannot guarantee the support for issues too far from our own roadmap.
+
+Install with: `npm install @cantoo/pdf-lib`
+
+<hr/>
+
 <a href="https://pdf-lib.js.org">
 <h1 align="center">
 <img alt="pdf-lib" height="300" src="https://raw.githubusercontent.com/Hopding/pdf-lib-docs/master/assets/logo-full.svg?sanitize=true">
@@ -64,11 +72,13 @@
   - [Embed PDF Pages](#embed-pdf-pages)
   - [Embed Font and Measure Text](#embed-font-and-measure-text)
   - [Add Attachments](#add-attachments)
+  - [Extract Attachments](#extract-attachments)
   - [Set Document Metadata](#set-document-metadata)
   - [Read Document Metadata](#read-document-metadata)
   - [Set Viewer Preferences](#set-viewer-preferences)
   - [Read Viewer Preferences](#read-viewer-preferences)
   - [Draw SVG Paths](#draw-svg-paths)
+  - [Draw SVG](#draw-svg)
 - [Deno Usage](#deno-usage)
 - [Complete Examples](#complete-examples)
 - [Installation](#installation)
@@ -109,6 +119,7 @@
 - Set viewer preferences
 - Read viewer preferences
 - Add attachments
+- Extract attachments
 
 ## Motivation
 
@@ -965,6 +976,22 @@ const pdfBytes = await pdfDoc.save()
 //   • Rendered in an <iframe>
 ```
 
+### Extract Attachments
+
+If you load a PDF that has `cars.csv` as an attachment, you can use the
+following to extract the attachments:
+
+<!-- prettier-ignore -->
+```js
+const pdfDoc = await PDFDocument.load(...)
+const attachments = pdfDoc.getAttachments()
+const csv = attachments.find(({ name }) => name === 'cars.csv')
+fs.writeFileSync(csv.name, csv.data)
+```
+
+> NOTE: The method also finds attachments added after the last call to
+> `save()`.
+
 ### Set Document Metadata
 
 _This example produces [this PDF](assets/pdfs/examples/set_document_metadata.pdf)_.
@@ -1211,6 +1238,37 @@ const pdfBytes = await pdfDoc.save()
 //   • Written to a file in Node
 //   • Downloaded from the browser
 //   • Rendered in an <iframe>
+```
+
+### Draw SVG
+
+```js
+import { PDFDocument, rgb } from 'pdf-lib'
+
+// SVG of a square inside a square
+const svg = `<svg width="100" height="100">
+  <rect y="0" x="0" width="100" height="100" fill="none" stroke="black"/>
+  <rect y="25" x="25" width="50" height="50" fill="black"/>
+</svg>`;
+const svg2 = '<svg><image href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVQYV2NgYAAAAAMAAWgmWQ0AAAAASUVORK5CYII="/></svg>'
+
+// Create a new PDFDocument
+const pdfDoc = await PDFDocument.create()
+
+// Add a blank page to the document
+const page = pdfDoc.addPage()
+
+// drawSvg can accept the svg as a string, as long as there are no images in it
+page.moveTo(100, 10)
+page.drawSvg(svg)
+
+// If the svg has images, or if you don't know if it does, you should call embedSVG first
+page.moveTo(200, 10)
+const pdfSvg = await pdfDoc.embedSvg(svg2)
+page.drawSvg(pdfSvg)
+
+// Serialize the PDFDocument to bytes (a Uint8Array)
+const pdfBytes = await pdfDoc.save()
 ```
 
 ## Deno Usage
@@ -1614,34 +1672,25 @@ See also [MAINTAINERSHIP.md#communication](docs/MAINTAINERSHIP.md#communication)
 
 ## Encryption Handling
 
-**`pdf-lib` does not currently support encrypted documents.** You should not use `pdf-lib` with encrypted documents. However, this is a feature that could be added to `pdf-lib`. Please [create an issue](https://github.com/Hopding/pdf-lib/issues/new) if you would find this feature helpful!
+**`pdf-lib` does support encrypted documents.**
 
-When an encrypted document is passed to `PDFDocument.load(...)`, an error will be thrown:
-
-<!-- prettier-ignore -->
-```js
-import { PDFDocument, EncryptedPDFError } from 'pdf-lib'
-
-const encryptedPdfBytes = ...
-
-// Assignment fails. Throws an `EncryptedPDFError`.
-const pdfDoc = PDFDocument.load(encryptedPdfBytes)
-```
-
-This default behavior is usually what you want. It allows you to easily detect if a given document is encrypted, and it prevents you from trying to modify it. However, if you really want to load the document, you can use the `{ ignoreEncryption: true }` option:
+To load a document, use this:
 
 ```js
-import { PDFDocument } from 'pdf-lib'
-
-const encryptedPdfBytes = ...
-
-// Assignment succeeds. Does not throw an error.
-const pdfDoc = PDFDocument.load(encryptedPdfBytes, { ignoreEncryption: true })
+// Load a random document you know nothing about:
+const doc = PDFDocument.load(content, { ignoreEncryption: true })
+// Check if the document is encrypted:
+const isEncrypted = doc.isEncrypted
+// If isEncrypted is true, you know the you need to ask the user for the password.
 ```
 
-Note that **using this option does not decrypt the document**. This means that any modifications you attempt to make on the returned `PDFDocument` may fail, or have unexpected results.
+If you know the password of the document, or if it was provided by the user, you can now open the document with it:
 
-**You should not use this option.** It only exists for backwards compatibility reasons.
+```js
+// Load an encrypted document with its password:
+const password = "The password"
+const doc = PDFDocument.load(content, { ignoreEncryption: true, password })
+```
 
 ## Contributing
 

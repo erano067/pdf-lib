@@ -1,6 +1,6 @@
-import { copyStringIntoBuffer, numberToString } from 'src/utils/index';
+import { copyStringIntoBuffer, numberToString } from '../../utils/index';
 
-import PDFObject from 'src/core/objects/PDFObject';
+import PDFObject from './PDFObject';
 
 class PDFNumber extends PDFObject {
   static of = (value: number) => new PDFNumber(value);
@@ -36,7 +36,7 @@ class PDFNumber extends PDFObject {
   }
 
   copyBytesInto(buffer: Uint8Array, offset: number): number {
-    offset += copyStringIntoBuffer(this.stringValue, buffer, offset);
+    copyStringIntoBuffer(this.stringValue, buffer, offset);
     return this.stringValue.length;
   }
 }

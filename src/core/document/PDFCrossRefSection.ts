@@ -1,6 +1,6 @@
-import PDFRef from 'src/core/objects/PDFRef';
-import CharCodes from 'src/core/syntax/CharCodes';
-import { copyStringIntoBuffer, padStart } from 'src/utils';
+import PDFRef from '../objects/PDFRef';
+import CharCodes from '../syntax/CharCodes';
+import { copyStringIntoBuffer, padStart } from '../../utils';
 
 export interface Entry {
   ref: PDFRef;
@@ -41,7 +41,7 @@ class PDFCrossRefSection {
   }
 
   toString(): string {
-    let section = `xref\n`;
+    let section = 'xref\n';
 
     for (
       let rangeIdx = 0, rangeLen = this.subsections.length;
