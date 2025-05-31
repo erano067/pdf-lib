@@ -79,7 +79,7 @@ export default async (assets: Assets) => {
   });
 
   // Add an AcroForm or update the existing one
-  let acroForm = pdfDoc.catalog.getOrCreateAcroForm();
+  const acroForm = pdfDoc.catalog.getOrCreateAcroForm();
 
   // Create a placeholder where the the last 3 parameters of the
   // actual range will be replaced when signing is done.
