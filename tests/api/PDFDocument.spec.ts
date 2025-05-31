@@ -723,7 +723,7 @@ describe(`PDFDocument`, () => {
       await expect(noErrorFunc(1)).resolves.not.toThrowError();
     });
   });
-  
+
   describe('attach() method', () => {
     it('Saves to the same value after attaching a file', async () => {
       const pdfDoc1 = await PDFDocument.create({ updateMetadata: false });

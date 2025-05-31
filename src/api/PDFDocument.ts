@@ -175,7 +175,9 @@ export default class PDFDocument {
       bytes,
       parseSpeed,
       throwOnInvalidObject,
+      undefined,
       capNumbers,
+      undefined,
       forIncrementalUpdate,
     ).parseDocument();
     if (
@@ -196,14 +198,15 @@ export default class PDFDocument {
           (fileIds.get(0) as PDFHexString).asBytes(),
           password,
         ),
+        forIncrementalUpdate,
       ).parseDocument();
       const pdfDoc = new PDFDocument(decryptedContext, true, updateMetadata);
       if (forIncrementalUpdate) pdfDoc.takeSnapshot();
-      return pdfDoc;  
+      return pdfDoc;
     } else {
       const pdfDoc = new PDFDocument(context, ignoreEncryption, updateMetadata);
       if (forIncrementalUpdate) pdfDoc.takeSnapshot();
-      return pdfDoc;  
+      return pdfDoc;
     }
   }
 

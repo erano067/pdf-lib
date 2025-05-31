@@ -14,7 +14,9 @@ import PDFContext from 'src/core/PDFContext';
 import PDFObjectStream from 'src/core/structures/PDFObjectStream';
 import CharCodes from 'src/core/syntax/CharCodes';
 import { copyStringIntoBuffer, waitForTick } from 'src/utils';
-import PDFNumber from '../objects/PDFNumber';
+import PDFNumber from 'src/core/objects/PDFNumber';
+import PDFSecurity from 'src/core/security/PDFSecurity';
+import PDFStream from 'src/core/objects/PDFStream';
 
 export interface SerializationInfo {
   size: number;
@@ -53,14 +55,8 @@ class PDFWriter {
 
   async serializeToBuffer(): Promise<Uint8Array> {
     const incremental = !(this.snapshot instanceof DefaultDocumentSnapshot);
-    const {
-      size,
-      header,
-      indirectObjects,
-      xref,
-      trailerDict,
-      trailer,
-    } = await this.computeBufferSize(incremental);
+    const { size, header, indirectObjects, xref, trailerDict, trailer } =
+      await this.computeBufferSize(incremental);
 
     let offset = 0;
     const buffer = new Uint8Array(size);
