@@ -1,5 +1,5 @@
 {
-  "name": "@cantoo/pdf-lib",
+  "name": "@adnsistemas/pdf-lib",
   "version": "2.4.2",
   "description": "Create and modify PDF files with JavaScript",
   "author": "Andrew Dillon <andrew.dillon.j@gmail.com>",
@@ -143,9 +143,9 @@
   "license": "MIT",
   "private": false,
   "homepage": "https://pdf-lib.js.org",
-  "repository": "git+https://github.com/cantoo-scribe/pdf-lib.git",
+  "repository": "git+https://github.com/adnsistemas/pdf-lib.git",
   "bugs": {
-    "url": "https://github.com/cantoo-scribe/pdf-lib/issues"
+    "url": "https://github.com/adnsistemas/pdf-lib/issues"
   },
   "keywords": [
     "pdf-lib",
