@@ -1,8 +1,8 @@
 import {
   DefaultDocumentSnapshot,
   defaultDocumentSnapshot,
-  DocumentSnapshot,
 } from '../../api/snapshot';
+import type { DocumentSnapshot } from '../../api/snapshot';
 import PDFCrossRefSection from '../document/PDFCrossRefSection';
 import PDFHeader from '../document/PDFHeader';
 import PDFTrailer from '../document/PDFTrailer';
