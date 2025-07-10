@@ -1,4 +1,4 @@
-import { PDFObject, PDFRef } from 'src/core';
+import type { PDFObject, PDFRef } from 'src/core';
 
 export interface DocumentSnapshot {
   pdfSize: number;
