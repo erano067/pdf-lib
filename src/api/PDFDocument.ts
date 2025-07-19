@@ -54,11 +54,11 @@ import {
   EmbedFontOptions,
   SetTitleOptions,
   IncrementalSaveOptions,
-} from 'src/api/PDFDocumentOptions';
-import PDFObject from 'src/core/objects/PDFObject';
-import PDFRef from 'src/core/objects/PDFRef';
-import { Fontkit } from 'src/types/fontkit';
-import { TransformationMatrix } from 'src/types/matrix';
+} from './PDFDocumentOptions';
+import PDFObject from '../core/objects/PDFObject';
+import PDFRef from '../core/objects/PDFRef';
+import { Fontkit } from '../types/fontkit';
+import { TransformationMatrix } from '../types/matrix';
 import {
   assertIs,
   assertIsOneOfOrUndefined,
@@ -71,15 +71,16 @@ import {
   pluckIndices,
   range,
   toUint8Array,
-} from 'src/utils';
-import FileEmbedder, { AFRelationship } from 'src/core/embedders/FileEmbedder';
-import PDFEmbeddedFile from 'src/api/PDFEmbeddedFile';
-import PDFJavaScript from 'src/api/PDFJavaScript';
-import JavaScriptEmbedder from 'src/core/embedders/JavaScriptEmbedder';
+} from '../utils';
+import FileEmbedder, { AFRelationship } from '../core/embedders/FileEmbedder';
+import PDFEmbeddedFile from './PDFEmbeddedFile';
+import PDFJavaScript from './PDFJavaScript';
+import JavaScriptEmbedder from '../core/embedders/JavaScriptEmbedder';
 import { CipherTransformFactory } from '../core/crypto';
 import PDFSvg from './PDFSvg';
 import PDFSecurity, { SecurityOptions } from '../core/security/PDFSecurity';
-import { DocumentSnapshot, IncrementalDocumentSnapshot } from './snapshot';
+import { IncrementalDocumentSnapshot } from './snapshot';
+import type { DocumentSnapshot } from './snapshot';
 
 export type PDFAttachment = {
   name: string;

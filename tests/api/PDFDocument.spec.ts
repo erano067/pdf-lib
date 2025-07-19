@@ -16,7 +16,7 @@ import {
   ViewerPreferences,
   StandardFonts,
   AFRelationship,
-} from 'src/index';
+} from '../../src/index';
 import { PDFAttachment } from '../../src/api/PDFDocument';
 
 const examplePngImageBase64 =

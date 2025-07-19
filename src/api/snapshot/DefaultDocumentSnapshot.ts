@@ -1,5 +1,5 @@
-import type { PDFObject, PDFRef } from 'src/core';
-import { DocumentSnapshot } from './DocumentSnapshot';
+import type { PDFObject, PDFRef } from '../../core';
+import type { DocumentSnapshot } from './DocumentSnapshot';
 
 export class DefaultDocumentSnapshot implements DocumentSnapshot {
   pdfSize = 0;
