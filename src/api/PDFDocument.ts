@@ -688,8 +688,10 @@ export default class PDFDocument {
     const pageCount = this.getPageCount();
     if (this.pageCount === 0) throw new RemovePageFromEmptyDocumentError();
     assertRange(index, 'index', 0, pageCount - 1);
+    const page = this.getPage(index);
     this.catalog.removeLeafNode(index);
     this.pageCount = pageCount - 1;
+    this.context.delete(page.ref);
   }
 
   /**
