@@ -43,6 +43,7 @@
     "Donald Ness (https://github.com/programmarchy)"
   ],
   "scripts": {
+    "prepare": "yarn build:cjs",
     "release": "yarn release:prep && release-it",
     "release:prep": "yarn clean && yarn lint && yarn typecheck && yarn test && yarn build",
     "get:version": "node --eval 'console.log(require(`./package.json`).version)'",
