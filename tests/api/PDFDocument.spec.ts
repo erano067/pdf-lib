@@ -778,6 +778,7 @@ describe(`PDFDocument`, () => {
         });
         const snapshot = pdfDoc.takeSnapshot();
         const page = pdfDoc.getPage(pageIndex);
+        snapshot.markObjForSave(pdfDoc.catalog);
         snapshot.markRefForSave(page.ref);
         const timesRomanFont = await pdfDoc.embedFont(StandardFonts.TimesRoman);
         const fontSize = 30;
@@ -793,11 +794,11 @@ describe(`PDFDocument`, () => {
           simplePdfBytes,
           pdfIncrementalBytes,
         ]);
-        const pdfSaveBytes = await pdfDoc.save();
-        expect(pdfIncrementalBytes.byteLength).toBeGreaterThan(0);
-        expect(finalPdfBytes.byteLength).toBeLessThanOrEqual(
-          pdfSaveBytes.byteLength,
+        const pdfSaveBytes = Buffer.from(
+          await pdfDoc.save({ useObjectStreams: false }),
         );
+        expect(pdfIncrementalBytes.byteLength).toBeGreaterThan(0);
+        expect(finalPdfBytes).toEqual(pdfSaveBytes);
       };
 
       await expect(noErrorFunc(0)).resolves.not.toThrowError();
