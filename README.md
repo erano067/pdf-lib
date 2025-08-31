@@ -36,6 +36,8 @@ Install with: `npm install @adnsistemas/pdf-lib`
       alt="Prettier Badge"
     />
   </a>
+  <!-- Coverall Badge -->
+  <a href='https://coveralls.io/github/adnsistemas/pdf-lib?branch=master'><img src='https://coveralls.io/repos/github/adnsistemas/pdf-lib/badge.svg?branch=master' alt='Coverage Status' /></a>
 </div>
 
 <br />

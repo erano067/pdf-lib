@@ -24,5 +24,5 @@ module.exports = {
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
 
   // Coverage reporting
-  coverageReporters: ['html'],
+  coverageReporters: ['html','lcov'],
 };
