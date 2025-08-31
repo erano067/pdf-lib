@@ -35,6 +35,7 @@ export interface LoadOptions {
   capNumbers?: boolean;
   password?: string;
   forIncrementalUpdate?: boolean;
+  preserveObjectsVersions?: boolean;
 }
 
 export interface CreateOptions {

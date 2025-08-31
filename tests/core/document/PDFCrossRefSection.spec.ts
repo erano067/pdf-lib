@@ -18,6 +18,11 @@ describe('PDFCrossRefSection', () => {
   xref2.addEntry(PDFRef.of(6), 192188923);
   xref2.addEntry(PDFRef.of(7), 129219);
 
+  const xref3 = PDFCrossRefSection.create();
+  xref3.addEntry(PDFRef.of(23), 21);
+  xref3.addEntry(PDFRef.of(16), 192188923);
+  xref3.addEntry(PDFRef.of(78), 129219);
+
   it('can be converted to a string with a single subsection', () => {
     expect(String(xref1)).toEqual(
       'xref\n' +
@@ -40,6 +45,20 @@ describe('PDFCrossRefSection', () => {
         '0000000024 00001 f \n' +
         '6 2\n' +
         '0192188923 00000 n \n' +
+        '0000129219 00000 n \n',
+    );
+  });
+
+  it('can be converted to a string with multiple subsections correctly ordered', () => {
+    expect(String(xref3)).toEqual(
+      'xref\n' +
+        '0 1\n' +
+        '0000000000 65535 f \n' +
+        '16 1\n' +
+        '0192188923 00000 n \n' +
+        '23 1\n' +
+        '0000000021 00000 n \n' +
+        '78 1\n' +
         '0000129219 00000 n \n',
     );
   });
@@ -84,5 +103,11 @@ describe('PDFCrossRefSection', () => {
           '0000129219 00000 n \n ',
       ),
     );
+  });
+
+  it('lists its entries, without entry 0', () => {
+    expect(xref1.listRefs().length).toBe(4);
+    expect(xref2.listRefs().length).toBe(4);
+    expect(xref3.listRefs().length).toBe(3);
   });
 });

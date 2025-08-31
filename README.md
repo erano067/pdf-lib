@@ -50,6 +50,7 @@ Install with: `npm install @adnsistemas/pdf-lib`
   - [Create Document](#create-document)
   - [Modify Document](#modify-document)
   - [Incremental Document Modification](#incremental-document-modification)
+  - [Get Incremental Update Changed Objects](#get-modified-objects-in-incremental-update)
   - [Create Form](#create-form)
   - [Fill Form](#fill-form)
   - [Flatten Form](#flatten-form)
@@ -86,6 +87,7 @@ Install with: `npm install @adnsistemas/pdf-lib`
 
 - Create new PDFs
 - Modify existing PDFs
+- Modify existing PDFs with incremental updates (preserves original PDF, required for electronic/digital signatures)
 - Create forms
 - Fill forms
 - Flatten forms
@@ -106,6 +108,7 @@ Install with: `npm install @adnsistemas/pdf-lib`
 - Read viewer preferences
 - Add attachments
 - Extract attachments
+- Get PDFObjects modified in a specific update of the PDF (used to check for changes between electronic/digital signatures)
 
 ## Motivation
 
@@ -415,6 +418,44 @@ const pdfBytes = await pdfDoc.save()
 
 // `pdfBytes` should be handled to the signing library to calculate the
 //  file hash and fill in the generated placeholder for the signature
+```
+
+### Get Modified Objects In Incremental Update
+
+You can load a PDF that has incremental update and get the PDFObjects that were modified in each update.
+The list includes the actual version of the object, at the time of the update, and previous versions of it.
+If actual is undefined, then the object was deleted in the update. If has no previous versions, the object was added in the update.
+
+<!-- prettier-ignore -->
+```js
+import { PDFDocument, StandardFonts } from 'pdf-lib';
+
+// This should be a Uint8Array or ArrayBuffer
+// This data can be obtained in a number of different ways
+// If your running in a Node environment, you could use fs.readFile()
+// In the browser, you could make a fetch() call and use res.arrayBuffer()
+const existingPdfBytes = ...
+
+// Load a PDFDocument from the existing PDF bytes, indicating you want the objects versions information preserved
+const pdfDoc = await PDFDocument.load(existingPdfBytes,{preserveObjectsVersions: true})
+
+// Get the first page of the document
+const lastChangedObjects = pdfDoc.getChangedObjects(); // last update
+const prevChangedObjects = pdfDoc.getChangedObjects(1); // 1 update prior the last one
+for (const lco of lastChangedObjects) {
+  const pco = prevChangedObjects.find( pco => pco.ref.objectNumber == lco.ref.objectNumber);
+  if (pco) { // the object changed in both updates
+    // pco.previous.length == lco.previos.length - 1
+    console.log('This is true',pco.actual, '===', lco.previous[0]);    
+  } else {
+    if (lco.previous.length)
+      console.log('The object existed, and was not updated in previous update');
+    else
+      console.log('The object was added in the last PDF update');
+  }
+  if (!lco.actual)
+    console.log('The object was deleted in the last PDF update');
+}
 ```
 
 

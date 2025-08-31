@@ -5,6 +5,7 @@ import {
   PDFBool,
   PDFContentStream,
   PDFContext,
+  PDFCrossRefSection,
   PDFDict,
   PDFHexString,
   PDFName,
@@ -286,5 +287,54 @@ describe('PDFContext', () => {
 
     expect(ref1).toBe(ref2);
     expect(context.lookup(ref1)).toBeInstanceOf(PDFContentStream);
+  });
+
+  describe('Objects Versions Handling', () => {
+    it('lists all xrefs in pdf', () => {
+      const context = PDFContext.create();
+      const xref = PDFCrossRefSection.create();
+      xref.addEntry(PDFRef.of(25, 1), 125);
+      xref.addDeletedEntry(PDFRef.of(26, 1), 1234);
+      context.xrefs.push(xref);
+      const xref2 = PDFCrossRefSection.create();
+      xref2.addEntry(PDFRef.of(35, 1), 1250);
+      xref2.addDeletedEntry(PDFRef.of(36, 1), 1212);
+      xref2.addEntry(PDFRef.of(45, 1), 1500);
+      context.xrefs.push(xref2);
+      let list = context.listXrefEntries();
+      expect(list.length).toBe(3);
+      list = context.listXrefEntries(0);
+      expect(list.length).toBe(2);
+    });
+
+    it('registers objects versions', () => {
+      const context = PDFContext.create(true);
+      context.assign(PDFRef.of(16, 0), PDFNumber.of(35));
+      context.assign(PDFRef.of(16, 0), PDFNumber.of(45));
+      context.assign(PDFRef.of(16, 1), PDFNumber.of(55));
+      context.assign(PDFRef.of(16, 0), PDFNumber.of(55));
+      context.assign(PDFRef.of(17, 0), PDFNumber.of(30));
+      context.assign(PDFRef.of(17, 0), PDFNumber.of(40));
+      context.delete(PDFRef.of(17, 0));
+      const previous16 = context.getObjectVersions(PDFRef.of(16, 0));
+      expect(previous16.length).toBe(2);
+      expect(context.getObjectVersions(PDFRef.of(16, 1)).length).toBe(0);
+      expect(previous16[0]).toEqual(PDFNumber.of(45));
+      expect(previous16[1]).toEqual(PDFNumber.of(35));
+      const previous17 = context.getObjectVersions(PDFRef.of(17, 0));
+      expect(previous17.length).toBe(2);
+      expect(previous17[0]).toEqual(PDFNumber.of(40));
+    });
+
+    it('does not registers objects versions by default', () => {
+      const context = PDFContext.create();
+      context.assign(PDFRef.of(16, 0), PDFNumber.of(35));
+      context.assign(PDFRef.of(16, 0), PDFNumber.of(45));
+      context.assign(PDFRef.of(16, 1), PDFNumber.of(55));
+      context.assign(PDFRef.of(16, 0), PDFNumber.of(55));
+      context.delete(PDFRef.of(16, 1));
+      expect(context.getObjectVersions(PDFRef.of(16, 0)).length).toBe(0);
+      expect(context.getObjectVersions(PDFRef.of(16, 1)).length).toBe(0);
+    });
   });
 });

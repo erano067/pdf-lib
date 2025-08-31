@@ -35,6 +35,7 @@ class PDFParser extends PDFObjectParser {
     capNumbers?: boolean,
     cryptoFactory?: CipherTransformFactory,
     forIncrementalUpdate?: boolean,
+    preserveObjectsVersions?: boolean,
   ) =>
     new PDFParser(
       pdfBytes,
@@ -44,6 +45,7 @@ class PDFParser extends PDFObjectParser {
       capNumbers,
       cryptoFactory,
       forIncrementalUpdate,
+      preserveObjectsVersions,
     );
 
   private readonly objectsPerTick: number;
@@ -60,10 +62,11 @@ class PDFParser extends PDFObjectParser {
     capNumbers = false,
     cryptoFactory?: CipherTransformFactory,
     forIncrementalUpdate = false,
+    preserveObjectsVersions = false,
   ) {
     super(
       ByteStream.of(pdfBytes),
-      PDFContext.create(),
+      PDFContext.create(preserveObjectsVersions),
       capNumbers,
       cryptoFactory,
     );
@@ -196,7 +199,15 @@ class PDFParser extends PDFObjectParser {
       object instanceof PDFRawStream &&
       object.dict.lookup(PDFName.of('Type')) === PDFName.of('XRef')
     ) {
-      PDFXRefStreamParser.forStream(object).parseIntoContext();
+      const entries = PDFXRefStreamParser.forStream(object).parseIntoContext();
+      if (entries.length) {
+        const xref = PDFCrossRefSection.createEmpty();
+        for (const entry of entries) {
+          if (entry.deleted) xref.addDeletedEntry(entry.ref, entry.offset);
+          else xref.addEntry(entry.ref, entry.offset);
+        }
+        this.context.xrefs.push(xref);
+      }
     }
     // always register the object and the ref, to properly handle object numeration
     this.context.assign(ref, object);
@@ -340,7 +351,8 @@ class PDFParser extends PDFObjectParser {
 
   private async parseDocumentSection(): Promise<void> {
     await this.parseIndirectObjects();
-    this.maybeParseCrossRefSection();
+    const xref = this.maybeParseCrossRefSection();
+    if (xref) this.context.xrefs.push(xref);
     this.maybeParseTrailerDict();
     this.maybeParseTrailer();
 

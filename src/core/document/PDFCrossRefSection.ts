@@ -212,6 +212,30 @@ class PDFCrossRefSection {
       this.chunkLength += 1;
     }
   }
+
+  /**
+   * Returns all the entries in the XREF section, except the first one (object == 0)
+   * @returns {Entry[]} All the entries in the XREF section
+   */
+  listRefs(): Entry[] {
+    const refList: Entry[] = [];
+    for (
+      let rangeIdx = 0, rangeLen = this.subsections.length;
+      rangeIdx < rangeLen;
+      rangeIdx++
+    ) {
+      const range = this.subsections[rangeIdx];
+      for (
+        let entryIdx = 0, entryLen = range.length;
+        entryIdx < entryLen;
+        entryIdx++
+      ) {
+        const entry = range[entryIdx];
+        if (entry.ref.objectNumber) refList.push(entry);
+      }
+    }
+    return refList;
+  }
 }
 
 export default PDFCrossRefSection;

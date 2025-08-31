@@ -1051,4 +1051,71 @@ describe(`PDFDocument`, () => {
       });
     });
   });
+
+  describe('getChangedObjects', () => {
+    const pdfBytes = fs.readFileSync('./assets/pdfs/with_update_sections.pdf');
+
+    it('returns an empty array if not open for preserving objects versions', async () => {
+      const pdfDoc = await PDFDocument.load(pdfBytes, {
+        preserveObjectsVersions: false,
+      });
+      expect(pdfDoc.getChangedObjects().length).toBe(0);
+    });
+
+    it("doesn't preserves objects versions by default", async () => {
+      const pdfDoc = await PDFDocument.load(pdfBytes);
+      expect(pdfDoc.getChangedObjects().length).toBe(0);
+    });
+
+    it('returns the actual state and previous versions of last updated objects', async () => {
+      const pdfDoc = await PDFDocument.load(pdfBytes, {
+        preserveObjectsVersions: true,
+      });
+      const list = pdfDoc.getChangedObjects();
+      expect(list.length).toBeGreaterThan(0);
+      for (const ov of list) {
+        if (!ov.actual) {
+          expect(ov.previous.length).toBeGreaterThan(0);
+        } else if (ov.previous.length) {
+          expect(ov.actual.constructor.name).toBe(
+            ov.previous[0].constructor.name,
+          );
+        }
+      }
+    });
+
+    it('returns the actual state and previous versions of previous updates, updated objects', async () => {
+      const pdfDoc = await PDFDocument.load(pdfBytes, {
+        preserveObjectsVersions: true,
+      });
+      const list2 = pdfDoc.getChangedObjects(2);
+      expect(list2.length).toBeGreaterThan(0);
+      // objects in this update, if exists in subsequent updates, should have an additional previos value
+      const list1 = pdfDoc.getChangedObjects(1);
+      expect(list1.length).toBeGreaterThan(0);
+      const list0 = pdfDoc.getChangedObjects();
+      expect(list0.length).toBeGreaterThan(0);
+      for (const l2o of list2) {
+        const l1o = list1.find(
+          (l1o) => l1o.ref.objectNumber === l2o.ref.objectNumber,
+        );
+        if (l1o) {
+          expect(l1o.previous.length).toBe(l2o.previous.length + 1);
+          expect(l1o.previous[0]).toEqual(l2o.actual);
+        }
+        const l0o = list0.find(
+          (l0o) => l0o.ref.objectNumber === l2o.ref.objectNumber,
+        );
+        if (l0o) {
+          if (l1o) {
+            expect(l0o.previous.length).toBe(l2o.previous.length + 2);
+            expect(l0o.previous[1]).toEqual(l2o.actual);
+          } else {
+            expect(l0o.previous.length).toBe(l2o.previous.length + 1);
+            expect(l0o.previous[0]).toEqual(l2o.actual);
+          }
+        }
+      }
+    });
+  });
 });

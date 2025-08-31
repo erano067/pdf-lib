@@ -92,6 +92,12 @@ export type PDFAttachment = {
   modificationDate: Date | undefined;
 };
 
+export type PDFObjectVersions = {
+  ref: PDFRef;
+  actual: PDFObject | undefined;
+  previous: PDFObject[];
+};
+
 /**
  * Represents a PDF document.
  */
@@ -161,6 +167,7 @@ export default class PDFDocument {
       capNumbers = false,
       password,
       forIncrementalUpdate = false,
+      preserveObjectsVersions = false,
     } = options;
 
     assertIs(pdf, 'pdf', ['string', Uint8Array, ArrayBuffer]);
@@ -170,6 +177,7 @@ export default class PDFDocument {
     assertIs(warnOnInvalidObjects, 'warnOnInvalidObjects', ['boolean']);
     assertIs(password, 'password', ['string', 'undefined']);
     assertIs(forIncrementalUpdate, 'forIncrementalUpdate', ['boolean']);
+    assertIs(preserveObjectsVersions, 'preserveObjectsVersions', ['boolean']);
 
     const bytes = toUint8Array(pdf);
     const context = await PDFParser.forBytesWithOptions(
@@ -180,6 +188,7 @@ export default class PDFDocument {
       capNumbers,
       undefined,
       forIncrementalUpdate,
+      preserveObjectsVersions,
     ).parseDocument();
     if (
       !!context.lookup(context.trailerInfo.Encrypt) &&
@@ -200,6 +209,7 @@ export default class PDFDocument {
           password,
         ),
         forIncrementalUpdate,
+        preserveObjectsVersions,
       ).parseDocument();
       const pdfDoc = new PDFDocument(decryptedContext, true, updateMetadata);
       if (forIncrementalUpdate) pdfDoc.takeSnapshot();
@@ -1636,6 +1646,49 @@ export default class PDFDocument {
       this.catalog.registerChange();
     }
     return snapshot;
+  }
+
+  /**
+   * Returns the update version of the object as 'actual', and all the previous versions, of the objects
+   * that has changed in the indicated update (or the last one).
+   * If document wasn't load to preserve objects versions, an empty array is returned.
+   * @param {number} lastUpdateMinusX If not the last update, how many updates before the last.
+   * @returns  {PDFObjectVersions[]} Objects modified in the update, and previous versions
+   */
+  getChangedObjects(lastUpdateMinusX: number = 0): PDFObjectVersions[] {
+    if (!this.context.preserveObjectsVersions) return [];
+    if (lastUpdateMinusX < 0) lastUpdateMinusX = 0;
+    const upind = this.context.xrefs.length - lastUpdateMinusX - 1;
+    const entries = this.context.listXrefEntries(upind);
+    if (!entries.length) return [];
+    const changed = new Map<PDFRef, PDFObjectVersions>();
+    for (const entry of entries) {
+      const ref = entry.ref;
+      changed.set(ref, {
+        ref,
+        actual: entry.deleted ? undefined : this.context.lookup(ref),
+        previous: this.context.getObjectVersions(ref),
+      });
+    }
+    // if not the las update, then check objects later modified and adjust PDFObjectVersions accordingly
+    if (!lastUpdateMinusX)
+      return Array.from(changed.entries()).map((value) => value[1]);
+    while (lastUpdateMinusX) {
+      lastUpdateMinusX -= 1;
+      const upind = this.context.xrefs.length - lastUpdateMinusX - 1;
+      const nentries = this.context.listXrefEntries(upind);
+      for (const nentry of nentries) {
+        const oce = changed.get(nentry.ref);
+        if (oce && oce.actual) {
+          oce.actual = oce.previous[0];
+          oce.previous = oce.previous.slice(1);
+        }
+      }
+    }
+    // if PDF has errors, it may happen to end with objects that has no current, nor previous versions
+    return Array.from(changed.entries())
+      .map((value) => value[1])
+      .filter((ov) => ov.actual || ov.previous.length);
   }
 
   private async prepareForSave(options: SaveOptions): Promise<void> {

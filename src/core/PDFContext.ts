@@ -21,6 +21,8 @@ import PDFContentStream from './structures/PDFContentStream';
 import PDFSecurity from './security/PDFSecurity';
 import { typedArrayFor } from '../utils';
 import { SimpleRNG } from '../utils/rng';
+import PDFCrossRefSection from './document/PDFCrossRefSection';
+import type { Entry } from './document/PDFCrossRefSection';
 
 type LookupKey = PDFRef | PDFObject | undefined;
 
@@ -55,7 +57,8 @@ const byAscendingObjectNumber = (
 
 class PDFContext {
   isDecrypted = true;
-  static create = () => new PDFContext();
+  static create = (withObjectVersions: boolean = false) =>
+    new PDFContext(withObjectVersions);
 
   largestObjectNumber: number;
   header: PDFHeader;
@@ -74,20 +77,30 @@ class PDFContext {
     originalBytes?: Uint8Array;
   };
   snapshot?: DocumentSnapshot;
+  xrefs: PDFCrossRefSection[] = [];
+  private _preserveObjectsVersions: boolean;
+  public get preserveObjectsVersions(): boolean {
+    return this._preserveObjectsVersions;
+  }
 
   security?: PDFSecurity;
 
   private readonly indirectObjects: Map<PDFRef, PDFObject>;
+  private readonly objectsPreviousVersions: Map<PDFRef, PDFObject[]>;
 
   private pushGraphicsStateContentStreamRef?: PDFRef;
   private popGraphicsStateContentStreamRef?: PDFRef;
 
-  private constructor() {
+  private constructor(preserveObjectsVersions?: boolean) {
+    this._preserveObjectsVersions = preserveObjectsVersions
+      ? preserveObjectsVersions
+      : false;
     this.largestObjectNumber = 0;
     this.header = PDFHeader.forVersion(1, 7);
     this.trailerInfo = {};
 
     this.indirectObjects = new Map();
+    this.objectsPreviousVersions = new Map();
     this.rng = SimpleRNG.withSeed(1);
     this.pdfFileDetails = {
       pdfSize: 0,
@@ -97,6 +110,17 @@ class PDFContext {
   }
 
   assign(ref: PDFRef, object: PDFObject): void {
+    if (this.preserveObjectsVersions) {
+      const prevOV = this.indirectObjects.get(ref);
+      if (prevOV) {
+        const prevList = this.objectsPreviousVersions.get(ref);
+        if (!prevList) {
+          this.objectsPreviousVersions.set(ref, [prevOV]);
+        } else {
+          prevList.unshift(prevOV);
+        }
+      }
+    }
     this.indirectObjects.set(ref, object);
     if (ref.objectNumber > this.largestObjectNumber) {
       this.largestObjectNumber = ref.objectNumber;
@@ -116,6 +140,18 @@ class PDFContext {
 
   delete(ref: PDFRef): boolean {
     if (this.snapshot) this.snapshot.markDeletedRef(ref);
+    if (this.preserveObjectsVersions) {
+      const object = this.indirectObjects.get(ref);
+      if (object) {
+        // check is not already deleted
+        const verlist = this.objectsPreviousVersions.get(ref);
+        if (verlist) {
+          verlist.unshift(object);
+        } else {
+          this.objectsPreviousVersions.set(ref, [object]);
+        }
+      }
+    }
     return this.indirectObjects.delete(ref);
   }
 
@@ -392,6 +428,19 @@ class PDFContext {
 
   registerObjectChange(obj: PDFObject) {
     if (this.snapshot) this.snapshot.markObjForSave(obj);
+  }
+
+  getObjectVersions(ref: PDFRef): PDFObject[] {
+    if (!this.preserveObjectsVersions) return [];
+    const list = this.objectsPreviousVersions.get(ref);
+    if (list) return list;
+    return [];
+  }
+
+  listXrefEntries(xrefIndex: number = -1): Entry[] {
+    if (xrefIndex < 0) xrefIndex = this.xrefs.length - 1;
+    if (xrefIndex < 0 || xrefIndex >= this.xrefs.length) return [];
+    return this.xrefs[xrefIndex].listRefs();
   }
 }
 

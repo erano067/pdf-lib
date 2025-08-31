@@ -426,4 +426,77 @@ describe('PDFParser', () => {
 
     expect(context.pdfFileDetails.originalBytes).toBeDefined();
   });
+
+  describe('xref preservation and object versions', () => {
+    const pdfBytes = fs.readFileSync('./assets/pdfs/with_update_sections.pdf');
+
+    it('preserves the xref information of PDF files with update sections', async () => {
+      const parser = PDFParser.forBytesWithOptions(pdfBytes);
+      const context = await parser.parseDocument();
+
+      expect(context.header).toBeInstanceOf(PDFHeader);
+      expect(context.header.toString()).toEqual('%PDF-1.7\n%');
+      expect(context.xrefs.length).toBe(5);
+      expect(context.listXrefEntries().length).toBe(5);
+    });
+
+    it('does not preserves objects versions by default', async () => {
+      const parser = PDFParser.forBytesWithOptions(pdfBytes);
+      const context = await parser.parseDocument();
+
+      expect(context.header).toBeInstanceOf(PDFHeader);
+      expect(context.header.toString()).toEqual('%PDF-1.7\n%');
+      expect(context.xrefs.length).toBe(5);
+      expect(context.getObjectVersions(PDFRef.of(334)).length).toBe(0);
+    });
+
+    it('preserves objects versions if indicated on creation', async () => {
+      const parser = PDFParser.forBytesWithOptions(
+        pdfBytes,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        true,
+      );
+      const context = await parser.parseDocument();
+
+      expect(context.header).toBeInstanceOf(PDFHeader);
+      expect(context.header.toString()).toEqual('%PDF-1.7\n%');
+      expect(context.xrefs.length).toBe(5);
+      // there are 4 versions of object 308, but doesn't really changes
+      const v308obj = context.getObjectVersions(PDFRef.of(308));
+      const last308 = context.lookup(PDFRef.of(308));
+      expect(v308obj.length).toBe(3);
+      expect(v308obj[2].toString()).toEqual(
+        `<<
+/Author (SE:W:CAR:MP)
+/CreationDate (D:20140102050054-08'00')
+/Creator (Adobe LiveCycle Designer ES 8.2)
+/ModDate (D:20140102050152-08'00')
+/Producer (Adobe Acrobat Pro 10.1.8)
+/Subject (Payment Voucher)
+>>`,
+      );
+      expect(last308).toBeDefined();
+      expect(last308?.toString()).toEqual(
+        `<<
+/Author (SE:W:CAR:MP)
+/CreationDate (D:20140102050054-08'00')
+/Creator (Adobe LiveCycle Designer ES 8.2)
+/ModDate (D:20140124112822-08'00')
+/Producer (Adobe Acrobat Pro 10.1.8)
+/Subject (Payment Voucher)
+>>`,
+      );
+      // three versions of object 291 (one in a stream)
+      const v291obj = context.getObjectVersions(PDFRef.of(291));
+      const last291 = context.lookup(PDFRef.of(291));
+      expect(v291obj.length).toBe(2);
+      expect(last291).toBeDefined();
+      expect(last291?.toString()).not.toEqual(v291obj[0].toString());
+    });
+  });
 });
