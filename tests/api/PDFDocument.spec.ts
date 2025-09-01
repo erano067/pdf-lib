@@ -809,7 +809,7 @@ describe(`PDFDocument`, () => {
       await expect(noErrorFunc(1)).resolves.not.toThrowError();
     });
 
-    it('registers all objects in incremental update', async () => {
+    it('registers all objects in incremental update, with or without using objects streams', async () => {
       const pdfDoc = await PDFDocument.load(simplePdfBytes, {
         forIncrementalUpdate: true,
       });
@@ -905,14 +905,29 @@ describe(`PDFDocument`, () => {
       const pdfSaveBytes = Buffer.from(
         await pdfDoc.save({ useObjectStreams: false }),
       );
+      const pdfStreamBytes = Buffer.from(
+        await pdfDoc.save({ useObjectStreams: true }),
+      );
       // read the PDF and get all the information from the incremental update
-      const signedPDF = await PDFDocument.load(pdfSaveBytes, {
+      const signedPDFNBS = await PDFDocument.load(pdfSaveBytes, {
         preserveObjectsVersions: true,
       });
-      const modifiedObjects = signedPDF.getChangedObjects();
+      const signedPDFBS = await PDFDocument.load(pdfStreamBytes, {
+        preserveObjectsVersions: true,
+      });
+      const modifiedObjects = signedPDFNBS.getChangedObjects();
       // PageTree, Catalog, PageLeaf (added page), 2 Fonts, PDFStream (Page Content), SignatureDict, Signature, SignatureWidget, WidgetDict
       expect(modifiedObjects.length).toBe(10);
       for (const mod of modifiedObjects) {
+        expect(mod.actual).toBeDefined();
+        if (mod.ref.objectNumber < originalLargestObjectNumber)
+          expect(mod.previous.length).toBeGreaterThan(0);
+        else expect(mod.previous.length).toBe(0);
+      }
+      const modifiedStreamObjects = signedPDFBS.getChangedObjects();
+      // PageTree, Catalog, PageLeaf (added page), 2 Fonts, PDFStream (Page Content), SignatureDict, Signature, SignatureWidget, WidgetDict, 2 x ObjectStream
+      expect(modifiedStreamObjects.length).toBe(12);
+      for (const mod of modifiedStreamObjects) {
         expect(mod.actual).toBeDefined();
         if (mod.ref.objectNumber < originalLargestObjectNumber)
           expect(mod.previous.length).toBeGreaterThan(0);
