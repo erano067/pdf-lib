@@ -129,7 +129,9 @@ class PDFContext {
 
   nextRef(): PDFRef {
     this.largestObjectNumber += 1;
-    return PDFRef.of(this.largestObjectNumber);
+    const ref = PDFRef.of(this.largestObjectNumber);
+    if (this.snapshot) this.snapshot.markRefForSave(ref);
+    return ref;
   }
 
   register(object: PDFObject): PDFRef {
