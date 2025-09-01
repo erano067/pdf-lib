@@ -16,6 +16,10 @@ import {
   ViewerPreferences,
   StandardFonts,
   AFRelationship,
+  PDFNumber,
+  PDFString,
+  PDFInvalidObject,
+  rgb,
 } from '../../src/index';
 import { PDFAttachment } from '../../src/api/PDFDocument';
 
@@ -803,6 +807,117 @@ describe(`PDFDocument`, () => {
 
       await expect(noErrorFunc(0)).resolves.not.toThrowError();
       await expect(noErrorFunc(1)).resolves.not.toThrowError();
+    });
+
+    it('registers all objects in incremental update', async () => {
+      const pdfDoc = await PDFDocument.load(simplePdfBytes, {
+        forIncrementalUpdate: true,
+      });
+      const originalLargestObjectNumber = pdfDoc.context.largestObjectNumber;
+      const page = pdfDoc.addPage([500, 300]);
+      const font = pdfDoc.embedStandardFont(StandardFonts.Helvetica);
+      const fontBold = pdfDoc.embedStandardFont(
+        StandardFonts.HelveticaBoldOblique,
+      );
+      page.drawRectangle({
+        x: 10,
+        y: 250,
+        width: 490,
+        height: 50,
+        borderWidth: 2,
+        borderColor: rgb(0.45, 0.45, 0.45),
+      });
+      page.drawText('ELECTRONIC SIGNATURE TEST', {
+        x: 20,
+        y: 100,
+        size: 14,
+        font,
+      });
+      page.drawText('PDF-LIB', { x: 50, y: 150, size: 12, font: fontBold });
+      const byteRange = PDFArray.withContext(pdfDoc.context);
+      byteRange.push(PDFNumber.of(0));
+      byteRange.push(PDFName.of('**********'));
+      byteRange.push(PDFName.of('**********'));
+      byteRange.push(PDFName.of('**********'));
+      const placeholder = PDFHexString.of(String.fromCharCode(0).repeat(2048));
+      const signatureDict = pdfDoc.context.obj({
+        Type: 'Sig',
+        Filter: 'Adobe.PPKLite',
+        SubFilter: 'adbe.pkcs7.detached',
+        ByteRange: byteRange,
+        Contents: placeholder,
+        Reason: PDFString.of('PDF-LIB Test'),
+        M: PDFString.fromDate(new Date()),
+        ContactInfo: PDFString.of('dabdala@adnsistemas.com.ar'),
+        Name: PDFString.of('Test'),
+        Location: PDFString.of('Ether'),
+        Prop_Build: {
+          Filter: { Name: 'Adobe.PPKLite' },
+        },
+      });
+      const signatureBuffer = new Uint8Array(signatureDict.sizeInBytes());
+      signatureDict.copyBytesInto(signatureBuffer, 0);
+      const signatureObj = PDFInvalidObject.of(signatureBuffer);
+      const signatureDictRef = pdfDoc.context.register(signatureObj);
+      const rect = PDFArray.withContext(pdfDoc.context);
+      const widgetRect = [0, 100, 0, 50];
+      widgetRect.forEach((c) => rect.push(PDFNumber.of(c)));
+      const apStream = pdfDoc.context.formXObject([], {
+        BBox: widgetRect,
+        Resources: {},
+      });
+      const widgetDict = pdfDoc.context.obj({
+        Type: 'Annot',
+        Subtype: 'Widget',
+        FT: 'Sig',
+        Rect: rect,
+        V: signatureDictRef,
+        T: PDFString.of('Signature1'),
+        F: 4,
+        P: page.ref,
+        AP: { N: pdfDoc.context.register(apStream) },
+        TU: 'Testing pdf-lib signature',
+      });
+      const widgetDictRef = pdfDoc.context.register(widgetDict);
+      let annotations = page.node.lookupMaybe(PDFName.of('Annots'), PDFArray);
+      if (typeof annotations === 'undefined') {
+        annotations = pdfDoc.context.obj([]);
+      }
+      annotations.push(widgetDictRef);
+      page.node.set(PDFName.of('Annots'), annotations);
+      const acroForm = pdfDoc.catalog.getOrCreateAcroForm();
+      let sigFlags;
+      if (acroForm.dict.has(PDFName.of('SigFlags'))) {
+        sigFlags = acroForm.dict.get(PDFName.of('SigFlags'));
+      } else {
+        sigFlags = PDFNumber.of(0);
+      }
+      const updatedFlags = PDFNumber.of(
+        (sigFlags! as PDFNumber).asNumber() | 1 | 2,
+      );
+      acroForm.dict.set(PDFName.of('SigFlags'), updatedFlags);
+      let fields = acroForm.dict.get(PDFName.of('Fields'));
+      if (!(fields instanceof PDFArray)) {
+        fields = pdfDoc.context.obj([]);
+        acroForm.dict.set(PDFName.of('Fields'), fields);
+      }
+      (fields as PDFArray).push(widgetDictRef);
+      const pdfSaveBytes = Buffer.from(
+        await pdfDoc.save({ useObjectStreams: false }),
+      );
+      // read the PDF and get all the information from the incremental update
+      const signedPDF = await PDFDocument.load(pdfSaveBytes, {
+        preserveObjectsVersions: true,
+      });
+      const modifiedObjects = signedPDF.getChangedObjects();
+      // PageTree, Catalog, PageLeaf (added page), 2 Fonts, PDFStream (Page Content), SignatureDict, Signature, SignatureWidget, WidgetDict
+      expect(modifiedObjects.length).toBe(10);
+      for (const mod of modifiedObjects) {
+        expect(mod.actual).toBeDefined();
+        if (mod.ref.objectNumber < originalLargestObjectNumber)
+          expect(mod.previous.length).toBeGreaterThan(0);
+        else expect(mod.previous.length).toBe(0);
+      }
     });
   });
 
