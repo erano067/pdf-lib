@@ -147,7 +147,7 @@ class PDFStreamWriter extends PDFWriter {
     const xrefStreamRef = this.context.nextRef();
     xrefStream.dict.set(
       PDFName.of('Size'),
-      PDFNumber.of(xrefStreamRef.objectNumber),
+      PDFNumber.of(this.context.largestObjectNumber + 1),
     );
     if (this.snapshot.prevStartXRef) {
       xrefStream.dict.set(
