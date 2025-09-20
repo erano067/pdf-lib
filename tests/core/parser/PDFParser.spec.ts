@@ -425,6 +425,9 @@ describe('PDFParser', () => {
     const context = await parser.parseDocument();
 
     expect(context.pdfFileDetails.originalBytes).toBeDefined();
+    expect(context.pdfFileDetails.originalBytes?.toString()).toEqual(
+      pdfBytes.toString(),
+    );
   });
 
   describe('xref preservation and object versions', () => {
